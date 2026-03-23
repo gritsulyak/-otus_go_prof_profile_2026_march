@@ -19,10 +19,12 @@ func workContended(id int, mu *sync.Mutex, wg *sync.WaitGroup) {
 		// --- Критическая секция ---
 		// Делаем что-то, что занимает время, пока держим лок.
 		// Чем дольше время тут, тем выше contention.
+		mu.Lock()
 		add += i
 		if i%1000 == 0 {
 			time.Sleep(time.Nanosecond)
 		}
+		mu.Unlock()
 		// --------------------------
 	}
 	fmt.Println(id, add)
