@@ -1,0 +1,29 @@
+# Шаг 1: Собрать профили
+go run slice_profile.go
+# → создаст cpu.prof и mem.prof
+
+# Шаг 2: CPU профиль — интерактивно
+go tool pprof cpu.prof
+(pprof) top10
+(pprof) list buildPortfolioV1
+Иногда нужно посмотреть на конкретную функцию, например append:
+(pprof) disasm append
+no matches found for regexp append // fix - compile 
+$ go build -gcflags="-l" -o slice slice_profile.go 
+$ go tool pprof ./slice cpu.prof
+(pprof) disasm buildPortfolioV1
+(pprof) disasm append
+no matches found for regexp append
+
+(pprof) web              # flame-график в браузере
+
+# Шаг 3: Memory профиль
+go tool pprof mem.prof
+(pprof) top10 -cum
+(pprof) list buildPortfolioV1
+(pprof) web
+
+# Шаг 4: Открыть сразу в браузере (удобнее)
+go tool pprof -http=:8081 cpu.prof // или mem.prof
+
+# оптимизация: пул 
