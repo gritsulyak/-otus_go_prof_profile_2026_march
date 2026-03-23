@@ -1,44 +1,60 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"runtime"
 	"runtime/trace"
 	"sync"
+	"time"
 )
 
-func work(id int, mu *sync.Mutex, wg *sync.WaitGroup) {
+// workContended имитирует высокую борьбу за мьютекс (lock contention)
+func workContended(id int, mu *sync.Mutex, wg *sync.WaitGroup) {
 	defer wg.Done()
-	for i := 0; i < 50; i++ {
-		mu.Lock()
-		_ = id * i // имитация работы
-		mu.Unlock()
+
+	// mu.Lock() // UNCOMMENT to see serial execution
+	add := 0
+	for i := id; i < 1000*1000; i++ {
+		// --- Критическая секция ---
+		// Делаем что-то, что занимает время, пока держим лок.
+		// Чем дольше время тут, тем выше contention.
+		add += i
+		if i%1000 == 0 {
+			time.Sleep(time.Nanosecond)
+		}
+		// --------------------------
 	}
+	fmt.Println(id, add)
+	// mu.Unlock() // UNCOMMENT
 }
 
 func main() {
-	f, _ := os.Create("trace.prof")
-	trace.Start(f)
+	numcpu := runtime.NumCPU()
+	runtime.GOMAXPROCS(numcpu)
+
+	f, err := os.Create("trace.prof")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	// Начинаем трассировку
+	err = trace.Start(f)
+	if err != nil {
+		panic(err)
+	}
 	defer trace.Stop()
 
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	for i := 0; i < 8; i++ {
+	// Запускаем много горутин
+	numGoroutines := 100
+	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
-		go work(i, &mu, &wg)
+		go workContended(i, &mu, &wg)
 	}
+
 	wg.Wait()
-}
-
-func workFast(id int, mu *sync.Mutex, wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	local := 0
-	for i := 0; i < 50; i++ {
-		local += id * i // работаем локально — без блокировки
-	}
-
-	mu.Lock()
-	_ = local // синхронизация один раз
-	mu.Unlock()
 }
